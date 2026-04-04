@@ -16,15 +16,15 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "startServer":
-            guard let args = call.arguments as ? [String: Any],
-            let port = args["port"] as ?Int else {
+            guard let args = call.arguments as? [String: Any],
+            let port = args["port"] as? Int else {
                 result(FlutterError(
                     code: "INVALID_ARGS",
                     message: "Missing or invalid 'port' argument",
                     details: nil))
                 return
             }
-            guard let serverJarPath = args["serverJarPath"] as ?String,
+            guard let serverJarPath = args["serverJarPath"] as? String,
             !serverJarPath.isEmpty else {
                 result(FlutterError(
                     code: "INVALID_ARGS",
@@ -32,10 +32,15 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
                     details: nil))
                 return
             }
-            let jvmPath = args["jvmPath"] as ?String
-            startServer(port: port, jvmPath: jvmPath, serverJarPath: serverJarPath, result: result)
+            let jvmPath = args["jvmPath"] as? String
+            startServer(port: port,
+                jvmPath: jvmPath,
+                serverJarPath: serverJarPath,
+                result: result)
+
         case "stopServer":
             stopServer(result: result)
+
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -49,6 +54,7 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
 
         let resolvedJava = resolveJavaExecutable(from: jvmPath)
         let javaExe = resolvedJava.path
+
         guard javaBinaryExists(at: javaExe) else {
             print("m_extension_server: failed to resolve Java executable. Checked: \(resolvedJava.checked)")
             result(FlutterError(
@@ -58,7 +64,9 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let process = configuredProcess(javaExe: javaExe, serverJarPath: serverJarPath, port: port)
+        let process = configuredProcess(javaExe: javaExe,
+            serverJarPath: serverJarPath,
+            port: port)
         print("m_extension_server: launching Java from \(javaExe)")
 
         do {
@@ -83,8 +91,7 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
         }
 
         process.terminate()
-        DispatchQueue.global(qos: .utility).async {
-            [weak self] in
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             process.waitUntilExit()
             self?.javaProcess = nil
             DispatchQueue.main.async {
@@ -107,7 +114,9 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
         terminateJavaProcess()
     }
 
-    private func configuredProcess(javaExe: String, serverJarPath: String, port: Int) -> Process {
+    private func configuredProcess(javaExe: String,
+    serverJarPath: String,
+    port: Int) -> Process {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: javaExe)
         process.arguments = ["-jar", serverJarPath, String(port)]
@@ -121,9 +130,7 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
 
         if let rawPath = normalizedInputPath(jvmPath), !rawPath.isEmpty {
             appendJavaCandidates(for: rawPath, to: &candidates)
-            if let executable = candidates.first(where: {
-                javaBinaryExists(at: $0)
-            }) {
+            if let executable = candidates.first(where: { javaBinaryExists(at: $0) }) {
                 return (executable, candidates)
             }
             return (candidates.first ?? rawPath, candidates)
@@ -132,55 +139,55 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
         if let javaHome = normalizedInputPath(ProcessInfo.processInfo.environment["JAVA_HOME"]),
         !javaHome.isEmpty {
             appendJavaCandidates(for: javaHome, to: &candidates)
-            if let executable = candidates.first(where: {
-                javaBinaryExists(at: $0)
-            }) {
+            if let executable = candidates.first(where: { javaBinaryExists(at: $0) }) {
                 return (executable, candidates)
             }
         }
 
         appendCandidate("/usr/bin/java", to: &candidates)
-        if let executable = candidates.first(where: {
-            javaBinaryExists(at: $0)
-        }) {
+        if let executable = candidates.first(where: { javaBinaryExists(at: $0) }) {
             return (executable, candidates)
         }
 
         return (candidates.first ?? "/usr/bin/java", candidates)
     }
 
-    private func appendJavaCandidates(forrawPath: String, to candidates: inout [String]) {
-        let expandedPath = (rawPath as NSString).expandingTildeInPath
+    private func appendJavaCandidates(for rawPath: String, to candidates: inout [String]) {
+        let expandedPath    = (rawPath as NSString).expandingTildeInPath
         let standardizedPath = (expandedPath as NSString).standardizingPath
-        guard !standardizedPath.isEmpty else {
-            return
-        }
+        guard !standardizedPath.isEmpty else { return }
 
         appendCandidate(standardizedPath, to: &candidates)
 
         var isDirectory: ObjCBool = false
-        if FileManager.default.fileExists(atPath: standardizedPath, isDirectory: &isDirectory),
-        isDirectory.boolValue {
+        let exists = FileManager.default.fileExists(atPath: standardizedPath,
+            isDirectory: &isDirectory)
+
+        if exists && isDirectory.boolValue {
             appendCandidate(
                 (standardizedPath as NSString).appendingPathComponent("bin/java"),
                 to: &candidates)
             appendCandidate(
                 (standardizedPath as NSString).appendingPathComponent("jre/bin/java"),
                 to: &candidates)
+
         } else if URL(fileURLWithPath: standardizedPath).lastPathComponent == "java" {
-            if let deduplicatedPath = deduplicatedAdjacentPathComponents(in: standardizedPath) {
-                appendCandidate(deduplicatedPath, to: &candidates)
+            if let deduped = deduplicatedAdjacentPathComponents(in: standardizedPath) {
+                appendCandidate(deduped, to: &candidates)
             }
 
-            let binDir = (standardizedPath as NSString).deletingLastPathComponent
+            let binDir   = (standardizedPath as NSString).deletingLastPathComponent
             let javaHome = (binDir as NSString).deletingLastPathComponent
-            appendCandidate((javaHome as NSString).appendingPathComponent("bin/java"), to: &candidates)
+            appendCandidate(
+                (javaHome as NSString).appendingPathComponent("bin/java"),
+                to: &candidates)
 
-            if let deduplicatedHome = deduplicatedAdjacentPathComponents(in: javaHome) {
+            if let dedupedHome = deduplicatedAdjacentPathComponents(in: javaHome) {
                 appendCandidate(
-                    (deduplicatedHome as NSString).appendingPathComponent("bin/java"),
+                    (dedupedHome as NSString).appendingPathComponent("bin/java"),
                     to: &candidates)
             }
+
         } else {
             appendCandidate(
                 (standardizedPath as NSString).appendingPathComponent("bin/java"),
@@ -190,21 +197,19 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
                 to: &candidates)
         }
 
-        if let deduplicatedPath = deduplicatedAdjacentPathComponents(in: standardizedPath) {
-            appendCandidate(deduplicatedPath, to: &candidates)
+        if let deduped = deduplicatedAdjacentPathComponents(in: standardizedPath) {
+            appendCandidate(deduped, to: &candidates)
             appendCandidate(
-                (deduplicatedPath as NSString).appendingPathComponent("bin/java"),
+                (deduped as NSString).appendingPathComponent("bin/java"),
                 to: &candidates)
             appendCandidate(
-                (deduplicatedPath as NSString).appendingPathComponent("jre/bin/java"),
+                (deduped as NSString).appendingPathComponent("jre/bin/java"),
                 to: &candidates)
         }
     }
 
     private func appendCandidate(_ path: String, to candidates: inout [String]) {
-        guard !path.isEmpty, !candidates.contains(path) else {
-            return
-        }
+        guard !path.isEmpty, !candidates.contains(path) else { return }
         candidates.append(path)
     }
 
@@ -221,9 +226,12 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
         if javaBinaryExists(at: javaExe),
         nsError.domain == NSCocoaErrorDomain,
         nsError.code == NSFileNoSuchFileError {
-            message += " The Java binary exists, so macOS likely rejected execution of the child process or one of its dependent libraries."
-            message += " In a sandboxed macOS app, spawning an arbitrary downloaded JVM commonly fails this way."
-            message += " Use an embedded helper tool signed for sandbox inheritance, or run the host app without App Sandbox."
+            message += " The Java binary exists, so macOS likely rejected execution"
+            + " of the child process or one of its dependent libraries."
+            + " In a sandboxed macOS app, spawning an arbitrary downloaded"
+            + " JVM commonly fails this way."
+            + " Use an embedded helper tool signed for sandbox inheritance,"
+            + " or run the host app without App Sandbox."
         }
 
         message += " [domain=\(nsError.domain) code=\(nsError.code)]"
@@ -232,11 +240,10 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
 
     private func normalizedInputPath(_ rawPath: String?) -> String? {
         guard var path = rawPath?.trimmingCharacters(in: .whitespacesAndNewlines),
-        !path.isEmpty else {
-            return nil
-        }
+        !path.isEmpty else { return nil }
 
-        if (path.hasPrefix("\"") && path.hasSuffix("\"")) || (path.hasPrefix("'") && path.hasSuffix("'")) {
+        if (path.hasPrefix("\"") && path.hasSuffix("\""))
+        || (path.hasPrefix("'") && path.hasSuffix("'")) {
             path.removeFirst()
             path.removeLast()
         }
@@ -248,11 +255,9 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
         return path
     }
 
-    private func deduplicatedAdjacentPathComponents(inpath: String) -> String? {
+    private func deduplicatedAdjacentPathComponents(in path: String) -> String? {
         let components = (path as NSString).pathComponents
-        guard components.count > 1 else {
-            return nil
-        }
+        guard components.count > 1 else { return nil }
 
         var deduplicated: [String] = []
         var didChange = false
@@ -265,10 +270,6 @@ public class MExtensionServerPlugin: NSObject, FlutterPlugin {
             deduplicated.append(component)
         }
 
-        guard didChange else {
-            return nil
-        }
-
-        return NSString.path(withComponents: deduplicated)
+        return didChange ? NSString.path(withComponents: deduplicated) : nil
     }
 }
