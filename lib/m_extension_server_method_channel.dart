@@ -10,9 +10,15 @@ class MethodChannelMExtensionServer extends MExtensionServerPlatform {
   final methodChannel = const MethodChannel('m_extension_server');
 
   @override
-  Future<String?> startServer(int port) async {
+  Future<String?> startServer(
+    int port, {
+    String? jvmPath,
+    String? serverJarPath,
+  }) async {
     final result = await methodChannel.invokeMethod<String>('startServer', {
       'port': port,
+      if (jvmPath != null) 'jvmPath': jvmPath,
+      if (serverJarPath != null) 'serverJarPath': serverJarPath,
     });
     return result;
   }

@@ -23,7 +23,24 @@ abstract class MExtensionServerPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<String?> startServer(int port) {
+  /// Starts the HTTP extension server on the given [port].
+  ///
+  /// Android does not need any extra parameters.
+  ///
+  /// Windows, Linux, and macOS start the server by spawning a Java
+  /// subprocess:
+  ///
+  /// * [jvmPath]       – absolute path to the `java` / `java.exe` executable,
+  ///                     or a Java home directory whose `bin/java` should be
+  ///                     used. When omitted the plugin resolves `java` via
+  ///                     `PATH` (or `JAVA_HOME` on macOS).
+  /// * [serverJarPath] – absolute path to the fat-JAR that implements the
+  ///                     extension server. Required on these platforms.
+  Future<String?> startServer(
+    int port, {
+    String? jvmPath,
+    String? serverJarPath,
+  }) {
     throw UnimplementedError('startServer() has not been implemented.');
   }
 

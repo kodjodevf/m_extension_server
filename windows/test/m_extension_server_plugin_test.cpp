@@ -22,21 +22,96 @@ using flutter::MethodResultFunctions;
 
 }  // namespace
 
-TEST(MExtensionServerPlugin, GetPlatformVersion) {
+// Calling stopServer when no server is running should succeed gracefully.
+TEST(MExtensionServerPlugin, StopServerWhenNotRunning) {
   MExtensionServerPlugin plugin;
-  // Save the reply value from the success callback.
+
   std::string result_string;
+  std::string error_code;
+
   plugin.HandleMethodCall(
-      MethodCall("getPlatformVersion", std::make_unique<EncodableValue>()),
+      MethodCall("stopServer", std::make_unique<EncodableValue>()),
       std::make_unique<MethodResultFunctions<>>(
           [&result_string](const EncodableValue* result) {
-            result_string = std::get<std::string>(*result);
+            if (result) result_string = std::get<std::string>(*result);
           },
-          nullptr, nullptr));
+          [&error_code](const std::string& code, const std::string&,
+                        const EncodableValue*) {
+            error_code = code;
+          },
+          nullptr));
 
-  // Since the exact string varies by host, just ensure that it's a string
-  // with the expected format.
-  EXPECT_TRUE(result_string.rfind("Windows ", 0) == 0);
+  EXPECT_TRUE(error_code.empty());
+  EXPECT_EQ(result_string, "Server was not running");
+}
+
+// startServer without a serverJarPath argument must return INVALID_ARGS.
+TEST(MExtensionServerPlugin, StartServerMissingJarReturnsError) {
+  MExtensionServerPlugin plugin;
+
+  std::string error_code;
+  std::string error_message;
+
+  EncodableMap args;
+  args[EncodableValue("port")] = EncodableValue(8080);
+  // Intentionally omit "serverJarPath".
+
+  plugin.HandleMethodCall(
+      MethodCall("startServer",
+                 std::make_unique<EncodableValue>(args)),
+      std::make_unique<MethodResultFunctions<>>(
+          nullptr,
+          [&error_code, &error_message](const std::string& code,
+                                        const std::string& msg,
+                                        const EncodableValue*) {
+            error_code    = code;
+            error_message = msg;
+          },
+          nullptr));
+
+  EXPECT_EQ(error_code, "INVALID_ARGS");
+  EXPECT_FALSE(error_message.empty());
+}
+
+// startServer without a port argument must return INVALID_ARGS.
+TEST(MExtensionServerPlugin, StartServerMissingPortReturnsError) {
+  MExtensionServerPlugin plugin;
+
+  std::string error_code;
+
+  EncodableMap args;
+  args[EncodableValue("serverJarPath")] = EncodableValue(std::string("server.jar"));
+  // Intentionally omit "port".
+
+  plugin.HandleMethodCall(
+      MethodCall("startServer",
+                 std::make_unique<EncodableValue>(args)),
+      std::make_unique<MethodResultFunctions<>>(
+          nullptr,
+          [&error_code](const std::string& code, const std::string&,
+                        const EncodableValue*) {
+            error_code = code;
+          },
+          nullptr));
+
+  EXPECT_EQ(error_code, "INVALID_ARGS");
+}
+
+// An unknown method must return NotImplemented (nullptr result, no error).
+TEST(MExtensionServerPlugin, UnknownMethodReturnsNotImplemented) {
+  MExtensionServerPlugin plugin;
+
+  bool not_implemented_called = false;
+
+  plugin.HandleMethodCall(
+      MethodCall("unknownMethod", std::make_unique<EncodableValue>()),
+      std::make_unique<MethodResultFunctions<>>(
+          nullptr, nullptr,
+          [&not_implemented_called]() {
+            not_implemented_called = true;
+          }));
+
+  EXPECT_TRUE(not_implemented_called);
 }
 
 }  // namespace test

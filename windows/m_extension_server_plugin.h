@@ -1,6 +1,8 @@
 #ifndef FLUTTER_PLUGIN_m_extension_server_PLUGIN_H_
 #define FLUTTER_PLUGIN_m_extension_server_PLUGIN_H_
 
+#include <windows.h>
+
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 
@@ -10,19 +12,30 @@ namespace m_extension_server {
 
 class MExtensionServerPlugin : public flutter::Plugin {
  public:
-  static void RegisterWithRegistrar(flutter::PluginRegistrarWindows *registrar);
+  static void RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar);
 
   MExtensionServerPlugin();
+  ~MExtensionServerPlugin() override;
 
-  virtual ~MExtensionServerPlugin();
-
-  // Disallow copy and assign.
   MExtensionServerPlugin(const MExtensionServerPlugin&) = delete;
   MExtensionServerPlugin& operator=(const MExtensionServerPlugin&) = delete;
 
-  // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(
-      const flutter::MethodCall<flutter::EncodableValue> &method_call,
+      const flutter::MethodCall<flutter::EncodableValue>& method_call,
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+
+ private:
+  HANDLE java_process_ = INVALID_HANDLE_VALUE;
+
+  void StopRunningProcess();
+
+  void StartServer(
+      int port,
+      const std::string& jvm_path,
+      const std::string& server_jar_path,
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+
+  void StopServer(
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 };
 
