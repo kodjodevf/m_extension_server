@@ -1,6 +1,10 @@
 name: m_extension_server
-description: "A new Flutter plugin project."
-version: 0.0.1
+description: "Flutter plugin that starts and stops an HTTP extension server.
+  Supported platforms:
+  - Android: embedded NanoHTTPD server with Dalvik class loading.
+  - Windows / Linux / macOS: launches a standalone Java server JAR via a
+    caller-supplied JVM path (java / java.exe)."
+version: 0.0.2
 
 environment:
   sdk: ^3.9.2
