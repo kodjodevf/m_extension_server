@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include "m_extension_server_plugin.h"
 
@@ -19,6 +20,24 @@ using flutter::EncodableMap;
 using flutter::EncodableValue;
 using flutter::MethodCall;
 using flutter::MethodResultFunctions;
+
+PROCESS_INFORMATION StartLongRunningTestProcess() {
+  std::string command = "ping -n 20 127.0.0.1";
+  std::vector<char> command_buffer(command.begin(), command.end());
+  command_buffer.push_back('\0');
+
+  STARTUPINFOA startup_info = {};
+  startup_info.cb = sizeof(startup_info);
+  startup_info.dwFlags = STARTF_USESHOWWINDOW;
+  startup_info.wShowWindow = SW_HIDE;
+
+  PROCESS_INFORMATION process_info = {};
+  const BOOL ok = CreateProcessA(
+      nullptr, command_buffer.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+      nullptr, nullptr, &startup_info, &process_info);
+  EXPECT_TRUE(ok);
+  return process_info;
+}
 
 }  // namespace
 
@@ -95,6 +114,41 @@ TEST(MExtensionServerPlugin, StartServerMissingPortReturnsError) {
           nullptr));
 
   EXPECT_EQ(error_code, "INVALID_ARGS");
+}
+
+// A process started before plugin re-instantiation must still be stoppable.
+TEST(MExtensionServerPlugin, StopServerReconnectsAfterPluginRecreation) {
+  PROCESS_INFORMATION process_info = StartLongRunningTestProcess();
+  ASSERT_NE(process_info.hProcess, nullptr);
+  ASSERT_NE(process_info.dwProcessId, 0u);
+  CloseHandle(process_info.hThread);
+
+  MExtensionServerPlugin::TrackProcessForTesting(process_info.hProcess,
+                                                 process_info.dwProcessId);
+
+  {
+    MExtensionServerPlugin old_plugin;
+  }
+
+  MExtensionServerPlugin new_plugin;
+
+  std::string result_string;
+  std::string error_code;
+
+  new_plugin.HandleMethodCall(
+      MethodCall("stopServer", std::make_unique<EncodableValue>()),
+      std::make_unique<MethodResultFunctions<>>(
+          [&result_string](const EncodableValue* result) {
+            if (result) result_string = std::get<std::string>(*result);
+          },
+          [&error_code](const std::string& code, const std::string&,
+                        const EncodableValue*) {
+            error_code = code;
+          },
+          nullptr));
+
+  EXPECT_TRUE(error_code.empty());
+  EXPECT_EQ(result_string, "Server stopped");
 }
 
 // An unknown method must return NotImplemented (nullptr result, no error).
