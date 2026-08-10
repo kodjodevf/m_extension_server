@@ -7,6 +7,7 @@
 #include <flutter/plugin_registrar_windows.h>
 
 #include <memory>
+#include <string>
 
 namespace m_extension_server {
 
@@ -24,10 +25,12 @@ class MExtensionServerPlugin : public flutter::Plugin {
       const flutter::MethodCall<flutter::EncodableValue>& method_call,
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 
- private:
-  HANDLE java_process_ = INVALID_HANDLE_VALUE;
+#ifdef M_EXTENSION_SERVER_TESTING
+  static void TrackProcessForTesting(HANDLE process, DWORD process_id);
+#endif
 
-  void StopRunningProcess();
+ private:
+  bool StopRunningProcess(std::string* error_message = nullptr);
 
   void StartServer(
       int port,

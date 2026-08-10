@@ -4,7 +4,7 @@ description: "Flutter plugin that starts and stops an HTTP extension server.
   - Android: embedded NanoHTTPD server with Dalvik class loading.
   - Windows / Linux / macOS: launches a standalone Java server JAR via a
     caller-supplied JVM path (java / java.exe)."
-version: 0.0.2
+version: 0.0.3
 
 environment:
   sdk: ^3.9.2
