@@ -10,3 +10,7 @@
 ## 0.0.1
 
 * Initial Android-only release.
+## 0.0.4
+
+* Add an embedded, interpreter-only OpenJDK Zero runtime for physical iOS devices.
+* Bundle the iOS M-Extension-Server JAR and pause/resume it with app lifecycle.

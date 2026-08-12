@@ -8,6 +8,7 @@ class MExtensionServer {
   ///
   /// Quick reference:
   /// * **Android** — no extra parameters needed.
+  /// * **iOS** — no extra parameters needed; physical devices only.
   /// * **Windows / Linux / macOS** — provide [serverJarPath] (and optionally
   ///   [jvmPath]).
   Future<String?> startServer(
