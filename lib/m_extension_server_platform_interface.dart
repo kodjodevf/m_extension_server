@@ -25,7 +25,7 @@ abstract class MExtensionServerPlatform extends PlatformInterface {
 
   /// Starts the HTTP extension server on the given [port].
   ///
-  /// Android does not need any extra parameters.
+  /// Android and physical iOS devices do not need any extra parameters.
   ///
   /// Windows, Linux, and macOS start the server by spawning a Java
   /// subprocess:

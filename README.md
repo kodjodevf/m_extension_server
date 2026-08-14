@@ -1,15 +1,19 @@
 # m_extension_server
 
-A new Flutter plugin project.
+Flutter plugin for running M-Extension-Server:
 
-## Getting Started
+- Android: in-process Dalvik extension bridge.
+- iOS device: in-process OpenJDK Zero interpreter, loaded lazily without JIT.
+- macOS, Linux, Windows: standalone Java process.
 
-This project is a starting point for a Flutter
-[plug-in package](https://flutter.dev/to/develop-plugins),
-a specialized package that includes platform-specific implementation code for
-Android and/or iOS.
+On iOS, `pod install` downloads checksum-pinned runtime artifacts and creates
+`OpenJDKRuntime.xcframework`. The host must embed that framework without linking
+it at launch; see Mangayomi's Podfile integration.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```dart
+await MExtensionServer().startServer(port);
+await MExtensionServer().stopServer();
+```
 
+The iOS runtime supports physical devices only. The server listener pauses in
+the background and resumes when the app becomes active.
