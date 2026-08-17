@@ -381,7 +381,19 @@ object MihonInvoker {
 
         return runBlocking {
             val videos = source.getVideoList(sEpisode)
-            videos
+            videos.map { video ->
+                if (video.videoUrl.isNullOrEmpty() || video.status == Video.LOAD_VIDEO) {
+                    runCatching {
+                        val resolvedUrl = source.getVideoUrl(video)
+                        video.apply {
+                            videoUrl = resolvedUrl
+                            status = Video.READY
+                        }
+                    }.getOrDefault(video)
+                } else {
+                    video
+                }
+            }
         }
     }
 
