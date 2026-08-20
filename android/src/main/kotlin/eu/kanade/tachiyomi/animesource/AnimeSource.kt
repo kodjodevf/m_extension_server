@@ -1,9 +1,14 @@
 package eu.kanade.tachiyomi.animesource
 
+import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
+import eu.kanade.tachiyomi.animesource.model.AnimeRelation
+import eu.kanade.tachiyomi.animesource.model.AnimesPage
+import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.SAnime
+import eu.kanade.tachiyomi.animesource.model.SAnimeEpisodeUpdate
+import eu.kanade.tachiyomi.animesource.model.SAnimeSeasonUpdate
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
-import eu.kanade.tachiyomi.util.lang.awaitSingle
 import rx.Observable
 
 /**
@@ -24,51 +29,131 @@ interface AnimeSource {
         get() = ""
 
     /**
-     * Get the updated details for a anime.
-     *
-     * @since extensions-lib 1.5
-     * @param anime the anime to update.
-     * @return the updated anime.
+     * Whether the source has support for latest updates.
      */
-    @Suppress("DEPRECATION")
-    suspend fun getAnimeDetails(anime: SAnime): SAnime = fetchAnimeDetails(anime).awaitSingle()
+    val supportsLatest: Boolean
 
     /**
-     * Get all the available episodes for a anime.
-     *
-     * @since extensions-lib 1.5
-     * @param anime the anime to update.
-     * @return the episodes for the anime.
+     * Returns the list of filters for the source.
      */
-    @Suppress("DEPRECATION")
-    suspend fun getEpisodeList(anime: SAnime): List<SEpisode> = fetchEpisodeList(anime).awaitSingle()
+    fun getFilterList(): AnimeFilterList = AnimeFilterList()
 
     /**
-     * Get the list of videos a episode has. Pages should be returned
-     * in the expected order; the index is ignored.
+     * Get a page with a list of anime.
      *
-     * @since extensions-lib 1.5
-     * @param episode the episode.
-     * @return the videos for the episode.
+     * @since extensions-lib 17
+     * @param page the page number to retrieve.
      */
-    @Suppress("DEPRECATION")
-    suspend fun getVideoList(episode: SEpisode): List<Video> = fetchVideoList(episode).awaitSingle()
+    suspend fun getPopularAnime(page: Int): AnimesPage
+
+    /**
+     * Get a page with a list of latest anime updates.
+     *
+     * @since extensions-lib 17
+     * @param page the page number to retrieve.
+     */
+    suspend fun getLatestUpdates(page: Int): AnimesPage
+
+    /**
+     * Get a page with a list of anime.
+     *
+     * @since extensions-lib 17
+     * @param page the page number to retrieve.
+     * @param query the search query.
+     * @param filters the list of filters to apply.
+     */
+    suspend fun getSearchAnime(
+        page: Int,
+        query: String,
+        filters: AnimeFilterList,
+    ): AnimesPage
+
+    /**
+     * Fetches updated information for an anime.
+     *
+     * @since extensions-lib 17
+     */
+    suspend fun getAnimeEpisodeUpdate(
+        anime: SAnime,
+        episodes: List<SEpisode>,
+        fetchDetails: Boolean,
+        fetchEpisodes: Boolean,
+    ): SAnimeEpisodeUpdate
+
+    /**
+     * Fetches updated information for an anime seasons.
+     *
+     * @since extensions-lib 17
+     */
+    suspend fun getAnimeSeasonUpdate(
+        anime: SAnime,
+        seasons: List<SAnime>,
+        fetchDetails: Boolean,
+        fetchSeasons: Boolean,
+    ): SAnimeSeasonUpdate
+
+    /**
+     * Whether this source supports related anime list for an entry
+     *
+     * @since extensions-lib 17
+     */
+    val supportsRelatedAnime: Boolean
+        get() = false
+
+    /**
+     * Get anime related to [anime], grouped by relation label
+     *
+     * @since extensions-lib 17
+     */
+    suspend fun getRelatedAnimeList(anime: SAnime): List<AnimeRelation>
+
+    /**
+     * Get the list of hoster for an episode.
+     *
+     * @since extensions-lib 16
+     */
+    suspend fun getHosterList(episode: SEpisode): List<Hoster> = throw IllegalStateException("Not used")
+
+    /**
+     * Get the list of videos for a hoster.
+     *
+     * @since extensions-lib 16
+     */
+    suspend fun getVideoList(hoster: Hoster): List<Video> = throw IllegalStateException("Not used")
+
+    @Deprecated("Use the combined suspend API instead", ReplaceWith("getAnimeSeasonUpdate"))
+    suspend fun getSeasonList(anime: SAnime): List<SAnime> = throw UnsupportedOperationException()
+
+    @Deprecated("Use the hoster version instead")
+    suspend fun getVideoList(episode: SEpisode): List<Video> = throw UnsupportedOperationException()
 
     @Deprecated(
-        "Use the non-RxJava API instead",
-        ReplaceWith("getAnimeDetails"),
+        "Use the combined suspend API instead",
+        ReplaceWith("getAnimeEpisodeUpdate"),
     )
-    fun fetchAnimeDetails(anime: SAnime): Observable<SAnime> = throw IllegalStateException("Not used")
+    fun fetchAnimeDetails(anime: SAnime): Observable<SAnime> = throw UnsupportedOperationException()
+
+    @Deprecated(
+        "Use the combined suspend API instead",
+        ReplaceWith("getAnimeEpisodeUpdate"),
+    )
+    suspend fun getAnimeDetails(anime: SAnime): SAnime = throw UnsupportedOperationException()
+
+    @Deprecated(
+        "Use the combined suspend API instead",
+        ReplaceWith("getAnimeEpisodeUpdate"),
+    )
+    suspend fun getEpisodeList(anime: SAnime): List<SEpisode> = throw UnsupportedOperationException()
 
     @Deprecated(
         "Use the non-RxJava API instead",
         ReplaceWith("getEpisodeList"),
     )
-    fun fetchEpisodeList(anime: SAnime): Observable<List<SEpisode>> = throw IllegalStateException("Not used")
+    fun fetchEpisodeList(anime: SAnime): Observable<List<SEpisode>> = throw UnsupportedOperationException()
 
     @Deprecated(
         "Use the non-RxJava API instead",
         ReplaceWith("getVideoList"),
     )
-    fun fetchVideoList(episode: SEpisode): Observable<List<Video>> = throw IllegalStateException("Not used")
+    fun fetchVideoList(episode: SEpisode): Observable<List<Video>> = throw UnsupportedOperationException()
 }

@@ -1,7 +1,8 @@
-@file:Suppress("ktlint:standard:property-naming")
+@file:Suppress("ktlint:standard:property-naming", "PropertyName")
 
 package eu.kanade.tachiyomi.source.model
 
+import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 
 interface SManga : Serializable {
@@ -25,7 +26,16 @@ interface SManga : Serializable {
 
     var initialized: Boolean
 
+    var memo: JsonObject
+
+    fun getGenres(): List<String>? {
+        if (genre.isNullOrBlank()) return null
+        return genre?.split(", ")?.map { it.trim() }?.filterNot { it.isBlank() }?.distinct()
+    }
+
     fun copyFrom(other: SManga) {
+        title = other.title
+
         if (other.author != null) {
             author = other.author
         }
@@ -47,11 +57,28 @@ interface SManga : Serializable {
         }
 
         status = other.status
+        update_strategy = other.update_strategy
+        memo = other.memo
 
         if (!initialized) {
             initialized = other.initialized
         }
     }
+
+    fun copy(): SManga =
+        create().also {
+            it.url = url
+            it.title = title
+            it.artist = artist
+            it.author = author
+            it.description = description
+            it.genre = genre
+            it.status = status
+            it.thumbnail_url = thumbnail_url
+            it.update_strategy = update_strategy
+            it.initialized = initialized
+            it.memo = memo
+        }
 
     companion object {
         const val UNKNOWN = 0

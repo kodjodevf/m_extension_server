@@ -18,12 +18,16 @@ import m_extension_server.model.ChapterData
 import m_extension_server.model.DataBody
 import m_extension_server.model.EpisodeData
 import m_extension_server.model.JAnime
+import m_extension_server.model.JChapter
+import m_extension_server.model.JEpisode
 import m_extension_server.model.JFilterList
 import m_extension_server.model.JManga
 import m_extension_server.model.JPage
 import m_extension_server.model.MangaData
 import m_extension_server.model.MangaResponse
 import m_extension_server.model.toJAnime
+import m_extension_server.model.toJChapter
+import m_extension_server.model.toJEpisode
 import m_extension_server.model.toJManga
 import eu.kanade.tachiyomi.animesource.AnimeCatalogueSource
 import eu.kanade.tachiyomi.animesource.AnimeSource
@@ -36,6 +40,7 @@ import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.SChapter
@@ -45,6 +50,7 @@ import kotlinx.coroutines.runBlocking
 import com.kodjodevf.m_extension_server.MExtensionServerPlugin
 import com.kodjodevf.m_extension_server.instance
 import com.kodjodevf.m_extension_server.preferenceManager
+import m_extension_server.model.BridgeMemo
 
 object MihonInvoker {
 
@@ -66,7 +72,9 @@ object MihonInvoker {
             "getLatestManga" -> invokeGetLatestManga(source as CatalogueSource, data.page ?: 1)
             "getSearchManga" -> invokeGetSearchManga(source as CatalogueSource, data.page ?: 1, data.search ?: "", data.filterList)
             "getDetailsManga" -> invokeGetDetailsManga(source as CatalogueSource, data.mangaData)
+            "getMangaUrl" -> invokeGetMangaUrl(source as CatalogueSource, data.mangaData)
             "getChapterList" -> invokeGetChapterList(source as CatalogueSource, data.mangaData)
+            "getChapterUrl" -> invokeGetChapterUrl(source as CatalogueSource, data.chapterData)
             "getPageList" -> invokeGetPageList(source as CatalogueSource, data.chapterData)
             "preferencesManga" -> invokePreferencesManga(source as CatalogueSource)
             "headersAnime" -> invokeHeadersAnime(source as AnimeCatalogueSource)
@@ -76,7 +84,9 @@ object MihonInvoker {
             "getLatestAnime" -> invokeGetLatestAnime(source as AnimeCatalogueSource, data.page ?: 1)
             "getSearchAnime" -> invokeGetSearchAnime(source as AnimeCatalogueSource, data.page ?: 1, data.search ?: "", data.filterList)
             "getDetailsAnime" -> invokeGetDetailsAnime(source as AnimeCatalogueSource, data.animeData)
+            "getAnimeUrl" -> invokeGetAnimeUrl(source as AnimeCatalogueSource, data.animeData)
             "getEpisodeList" -> invokeGetEpisodeList(source as AnimeCatalogueSource, data.animeData)
+            "getEpisodeUrl" -> invokeGetEpisodeUrl(source as AnimeCatalogueSource, data.episodeData)
             "getVideoList" -> invokeGetVideoList(source as AnimeCatalogueSource, data.episodeData)
             "preferencesAnime" -> invokePreferencesAnime(source as AnimeCatalogueSource)
             else -> throw IllegalArgumentException("Unknown method: ${data.method}")
@@ -110,7 +120,11 @@ object MihonInvoker {
         runBlocking {
             val mangasPage = source.getPopularManga(page)
             MangaResponse(
-                mangas = mangasPage.mangas.map { it.toJManga() },
+                mangas =
+                    mangasPage.mangas.map { manga ->
+                        MihonMetadataCache.remember(source, manga)
+                        manga.toJManga()
+                    },
                 hasNextPage = mangasPage.hasNextPage,
             )
         }
@@ -120,9 +134,22 @@ object MihonInvoker {
         page: Int,
     ): MangaResponse =
         runBlocking {
-            val mangasPage = source.getLatestUpdates(page)
+            val mangasPage =
+                if (source.supportsLatest) {
+                    try {
+                        source.getLatestUpdates(page)
+                    } catch (_: UnsupportedOperationException) {
+                        source.getPopularManga(page)
+                    }
+                } else {
+                    source.getPopularManga(page)
+                }
             MangaResponse(
-                mangas = mangasPage.mangas.map { it.toJManga() },
+                mangas =
+                    mangasPage.mangas.map { manga ->
+                        MihonMetadataCache.remember(source, manga)
+                        manga.toJManga()
+                    },
                 hasNextPage = mangasPage.hasNextPage,
             )
         }
@@ -137,7 +164,11 @@ object MihonInvoker {
             val convertedFilters = filterList?.let { convertFilterList(source.getFilterList(), it) } ?: source.getFilterList()
             val mangasPage = source.getSearchManga(page, search, convertedFilters)
             MangaResponse(
-                mangas = mangasPage.mangas.map { it.toJManga() },
+                mangas =
+                    mangasPage.mangas.map { manga ->
+                        MihonMetadataCache.remember(source, manga)
+                        manga.toJManga()
+                    },
                 hasNextPage = mangasPage.hasNextPage,
             )
         }
@@ -150,58 +181,68 @@ object MihonInvoker {
             throw IllegalArgumentException("mangaData is required for getDetailsManga")
         }
 
-        if (source !is HttpSource) {
-            throw IllegalArgumentException("Source must be HttpSource for getDetailsManga")
-        }
-
-        val sManga =
-            SManga.create().apply {
-                url = mangaData.url ?: ""
-                title = mangaData.title ?: ""
-                artist = mangaData.artist
-                author = mangaData.author
-                description = mangaData.description
-                genre = mangaData.genre
-                status = mangaData.status ?: 0
-                thumbnail_url = mangaData.thumbnail_url
-                initialized = mangaData.initialized ?: false
-            }
-
         return runBlocking {
-            val detailedManga = source.getMangaDetails(sManga)
+            val detailedManga =
+                source
+                    .getMangaUpdate(
+                        manga = mangaData.toSManga(source),
+                        chapters = emptyList(),
+                        fetchDetails = true,
+                        fetchChapters = false,
+                    ).manga
+            MihonMetadataCache.remember(source, detailedManga)
             detailedManga.toJManga()
         }
+    }
+
+    private fun invokeGetMangaUrl(
+        source: CatalogueSource,
+        mangaData: MangaData?,
+    ): String {
+        if (mangaData == null) {
+            throw IllegalArgumentException("mangaData is required for getMangaUrl")
+        }
+        if (source !is HttpSource) {
+            throw IllegalArgumentException("Source must be HttpSource for getMangaUrl")
+        }
+        return source.getMangaUrl(mangaData.toSManga(source))
     }
 
     private fun invokeGetChapterList(
         source: CatalogueSource,
         mangaData: MangaData?,
-    ): List<SChapter> {
+    ): List<JChapter> {
         if (mangaData == null) {
             throw IllegalArgumentException("mangaData is required for getChapterList")
         }
 
-        if (source !is HttpSource) {
-            throw IllegalArgumentException("Source must be HttpSource for getChapterList")
-        }
-
-        val sManga =
-            SManga.create().apply {
-                url = mangaData.url ?: ""
-                title = mangaData.title ?: ""
-                artist = mangaData.artist
-                author = mangaData.author
-                description = mangaData.description
-                genre = mangaData.genre
-                status = mangaData.status ?: 0
-                thumbnail_url = mangaData.thumbnail_url
-                initialized = mangaData.initialized ?: false
-            }
-
         return runBlocking {
-            val chapters = source.getChapterList(sManga)
-            chapters
+            val chapters =
+                source
+                    .getMangaUpdate(
+                        manga = mangaData.toSManga(source),
+                        chapters = emptyList(),
+                        fetchDetails = false,
+                        fetchChapters = true,
+                    ).chapters
+            chapters.map { chapter ->
+                MihonMetadataCache.remember(source, chapter)
+                chapter.toJChapter()
+            }
         }
+    }
+
+    private fun invokeGetChapterUrl(
+        source: CatalogueSource,
+        chapterData: ChapterData?,
+    ): String {
+        if (chapterData == null) {
+            throw IllegalArgumentException("chapterData is required for getChapterUrl")
+        }
+        if (source !is HttpSource) {
+            throw IllegalArgumentException("Source must be HttpSource for getChapterUrl")
+        }
+        return source.getChapterUrl(chapterData.toSChapter(source))
     }
 
     private fun invokeGetPageList(
@@ -212,26 +253,22 @@ object MihonInvoker {
             throw IllegalArgumentException("chapterData is required for getPageList")
         }
 
-        if (source !is HttpSource) {
-            throw IllegalArgumentException("Source must be HttpSource for getPageList")
-        }
-
-        val sChapter =
-            SChapter.create().apply {
-                url = chapterData.url ?: ""
-                name = chapterData.name ?: ""
-                date_upload = chapterData.date_upload ?: 0L
-                chapter_number = chapterData.chapter_number ?: 0f
-                scanlator = chapterData.scanlator
-            }
-
         return runBlocking {
+            val sChapter = chapterData.toSChapter(source)
             val pages = source.getPageList(sChapter)
             pages.map { page ->
                 JPage(
                     index = page.index,
                     url = page.url,
-                    imageUrl = source.imageRequest(page).url.toString(),
+                    imageUrl =
+                        if (source is HttpSource) {
+                            if (page.imageUrl == null) {
+                                runCatching { page.imageUrl = source.getImageUrl(page) }
+                            }
+                            source.imageRequest(page).url.toString()
+                        } else {
+                            page.imageUrl ?: page.url
+                        },
                 )
             }
         }
@@ -308,9 +345,11 @@ object MihonInvoker {
             throw IllegalArgumentException("Source must be AnimeHttpSource for getDetailsAnime")
         }
 
+        val decoded = BridgeMemo.decode(animeData.url ?: "")
         val sAnime =
             SAnime.create().apply {
-                url = animeData.url ?: ""
+                url = decoded.url
+                memo = decoded.memo
                 title = animeData.title ?: ""
                 artist = animeData.artist
                 author = animeData.author
@@ -322,15 +361,31 @@ object MihonInvoker {
             }
 
         return runBlocking {
-            val detailedAnime = source.getAnimeDetails(sAnime)
+            val detailedAnime = runCatching { source.getAnimeDetails(sAnime) }.getOrElse {
+                val update = source.getAnimeEpisodeUpdate(sAnime, emptyList(), fetchDetails = true, fetchEpisodes = false)
+                update.anime
+            }
             detailedAnime.toJAnime()
         }
+    }
+
+    private fun invokeGetAnimeUrl(
+        source: AnimeCatalogueSource,
+        animeData: AnimeData?,
+    ): String {
+        if (animeData == null) {
+            throw IllegalArgumentException("animeData is required for getAnimeUrl")
+        }
+        if (source !is AnimeHttpSource) {
+            throw IllegalArgumentException("Source must be AnimeHttpSource for getAnimeUrl")
+        }
+        return source.getAnimeUrl(animeData.toSAnime())
     }
 
     private fun invokeGetEpisodeList(
         source: AnimeCatalogueSource,
         animeData: AnimeData?,
-    ): List<SEpisode> {
+    ): List<JEpisode> {
         if (animeData == null) {
             throw IllegalArgumentException("animeData is required for getEpisodeList")
         }
@@ -339,9 +394,11 @@ object MihonInvoker {
             throw IllegalArgumentException("Source must be AnimeHttpSource for getEpisodeList")
         }
 
+        val decoded = BridgeMemo.decode(animeData.url ?: "")
         val sAnime =
             SAnime.create().apply {
-                url = animeData.url ?: ""
+                url = decoded.url
+                memo = decoded.memo
                 title = animeData.title ?: ""
                 artist = animeData.artist
                 author = animeData.author
@@ -353,10 +410,81 @@ object MihonInvoker {
             }
 
         return runBlocking {
-            val episodes = source.getEpisodeList(sAnime)
-            episodes
+            val episodes =
+                runCatching { source.getEpisodeList(sAnime) }.getOrElse {
+                    val update = source.getAnimeEpisodeUpdate(sAnime, emptyList(), fetchDetails = false, fetchEpisodes = true)
+                    update.episodes
+                }
+            episodes.map { it.toJEpisode() }
         }
     }
+
+    private fun invokeGetEpisodeUrl(
+        source: AnimeCatalogueSource,
+        episodeData: EpisodeData?,
+    ): String {
+        if (episodeData == null) {
+            throw IllegalArgumentException("episodeData is required for getEpisodeUrl")
+        }
+        if (source !is AnimeHttpSource) {
+            throw IllegalArgumentException("Source must be AnimeHttpSource for getEpisodeUrl")
+        }
+        return source.getEpisodeUrl(episodeData.toSEpisode())
+    }
+
+    private fun MangaData.toSManga(source: Source): SManga =
+        SManga.create().also { manga ->
+            val decodedUrl = BridgeMemo.decode(url ?: "")
+            manga.url = decodedUrl.url
+            manga.memo = decodedUrl.memo
+            manga.title = title ?: ""
+            manga.artist = artist
+            manga.author = author
+            manga.description = description
+            manga.genre = genre
+            manga.status = status ?: 0
+            manga.thumbnail_url = thumbnail_url
+            manga.initialized = initialized ?: false
+            MihonMetadataCache.restore(source, manga)
+        }
+
+    private fun ChapterData.toSChapter(source: Source): SChapter =
+        SChapter.create().also { chapter ->
+            val decodedUrl = BridgeMemo.decode(url ?: "")
+            chapter.url = decodedUrl.url
+            chapter.memo = decodedUrl.memo
+            chapter.name = name ?: ""
+            chapter.date_upload = date_upload ?: 0L
+            chapter.chapter_number = chapter_number ?: 0f
+            chapter.scanlator = scanlator
+            MihonMetadataCache.restore(source, chapter)
+        }
+
+    private fun AnimeData.toSAnime(): SAnime =
+        SAnime.create().also { anime ->
+            val decodedUrl = BridgeMemo.decode(url ?: "")
+            anime.url = decodedUrl.url
+            anime.memo = decodedUrl.memo
+            anime.title = title ?: ""
+            anime.artist = artist
+            anime.author = author
+            anime.description = description
+            anime.genre = genre
+            anime.status = status ?: 0
+            anime.thumbnail_url = thumbnail_url
+            anime.initialized = initialized ?: false
+        }
+
+    private fun EpisodeData.toSEpisode(): SEpisode =
+        SEpisode.create().also { episode ->
+            val decodedUrl = BridgeMemo.decode(url ?: "")
+            episode.url = decodedUrl.url
+            episode.memo = decodedUrl.memo
+            episode.name = name ?: ""
+            episode.date_upload = date_upload ?: 0L
+            episode.episode_number = episode_number ?: 0f
+            episode.scanlator = scanlator
+        }
 
     private fun invokeGetVideoList(
         source: AnimeCatalogueSource,
@@ -370,9 +498,11 @@ object MihonInvoker {
             throw IllegalArgumentException("Source must be AnimeHttpSource for getVideoList")
         }
 
+        val decoded = BridgeMemo.decode(episodeData.url ?: "")
         val sEpisode =
             SEpisode.create().apply {
-                url = episodeData.url ?: ""
+                url = decoded.url
+                memo = decoded.memo
                 name = episodeData.name ?: ""
                 date_upload = episodeData.date_upload ?: 0L
                 episode_number = episodeData.episode_number ?: 0f
@@ -380,19 +510,34 @@ object MihonInvoker {
             }
 
         return runBlocking {
-            val videos = source.getVideoList(sEpisode)
-            videos.map { video ->
-                if (video.videoUrl.isNullOrEmpty() || video.status == Video.LOAD_VIDEO) {
-                    runCatching {
-                        val resolvedUrl = source.getVideoUrl(video)
-                        video.apply {
-                            videoUrl = resolvedUrl
-                            status = Video.READY
-                        }
-                    }.getOrDefault(video)
-                } else {
-                    video
+            var videos = runCatching { source.getVideoList(sEpisode) }.getOrDefault(emptyList())
+            if (videos.isEmpty()) {
+                val hosters = runCatching { source.getHosterList(sEpisode) }.getOrDefault(emptyList())
+                if (hosters.isNotEmpty()) {
+                    videos = hosters.flatMap { hoster ->
+                        hoster.videoList ?: runCatching { source.getVideoList(hoster) }.getOrDefault(emptyList())
+                    }
                 }
+            }
+            videos.map { video ->
+                val resolvedVideo =
+                    if (video.videoUrl.isNullOrEmpty() || video.status == Video.LOAD_VIDEO) {
+                        runCatching {
+                            val v = source.resolveVideo(video) ?: video
+                            if (v.videoUrl.isNullOrEmpty() || v.status == Video.LOAD_VIDEO) {
+                                val resolvedUrl = source.getVideoUrl(v)
+                                v.apply {
+                                    videoUrl = resolvedUrl
+                                    status = Video.READY
+                                }
+                            } else {
+                                v
+                            }
+                        }.getOrDefault(video)
+                    } else {
+                        video
+                    }
+                resolvedVideo
             }
         }
     }

@@ -1,6 +1,8 @@
-@file:Suppress("ktlint:standard:property-naming")
+@file:Suppress("ktlint:standard:property-naming", "PropertyName")
 
 package eu.kanade.tachiyomi.source.model
+
+import kotlinx.serialization.json.JsonObject
 
 class SMangaImpl : SManga {
     override lateinit var url: String
@@ -22,4 +24,6 @@ class SMangaImpl : SManga {
     override var update_strategy: UpdateStrategy = UpdateStrategy.ALWAYS_UPDATE
 
     override var initialized: Boolean = false
+
+    override var memo: JsonObject = JsonObject(emptyMap())
 }
