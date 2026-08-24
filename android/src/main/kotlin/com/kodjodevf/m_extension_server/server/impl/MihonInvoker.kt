@@ -77,6 +77,7 @@ object MihonInvoker {
             "getChapterUrl" -> invokeGetChapterUrl(source as CatalogueSource, data.chapterData)
             "getPageList" -> invokeGetPageList(source as CatalogueSource, data.chapterData)
             "preferencesManga" -> invokePreferencesManga(source as CatalogueSource)
+            "setPreferenceManga" -> invokeSetPreferenceManga(source as CatalogueSource, data)
             "headersAnime" -> invokeHeadersAnime(source as AnimeCatalogueSource)
             "filtersAnime" -> invokeFiltersAnime(source as AnimeCatalogueSource)
             "supportLatestAnime" -> invokeSupportLatestAnime(source as AnimeCatalogueSource)
@@ -89,6 +90,7 @@ object MihonInvoker {
             "getEpisodeUrl" -> invokeGetEpisodeUrl(source as AnimeCatalogueSource, data.episodeData)
             "getVideoList" -> invokeGetVideoList(source as AnimeCatalogueSource, data.episodeData)
             "preferencesAnime" -> invokePreferencesAnime(source as AnimeCatalogueSource)
+            "setPreferenceAnime" -> invokeSetPreferenceAnime(source as AnimeCatalogueSource, data)
             else -> throw IllegalArgumentException("Unknown method: ${data.method}")
         }
     }
@@ -550,8 +552,10 @@ object MihonInvoker {
 
         val preferenceManager: PreferenceManager? = preferenceManager
         val instance: MExtensionServerPlugin? = instance
-        val screen = preferenceManager!!.createPreferenceScreen(instance!!.applicationContext!!)
-        (source as ConfigurableSource).setupPreferenceScreen(screen)
+        val context = instance?.applicationContext ?: return preferences
+        preferenceManager?.sharedPreferencesName = "source_${source.id}"
+        val screen = preferenceManager!!.createPreferenceScreen(context)
+        (source as ConfigurableAnimeSource).setupPreferenceScreen(screen)
         processPreferences(screen, preferences)
 
         return preferences
@@ -564,10 +568,45 @@ object MihonInvoker {
         }
         val preferenceManager: PreferenceManager? = preferenceManager
         val instance: MExtensionServerPlugin? = instance
-        val screen = preferenceManager!!.createPreferenceScreen(instance!!.applicationContext!!)
+        val context = instance?.applicationContext ?: return preferences
+        preferenceManager?.sharedPreferencesName = "source_${source.id}"
+        val screen = preferenceManager!!.createPreferenceScreen(context)
         (source as ConfigurableSource).setupPreferenceScreen(screen)
         processPreferences(screen, preferences)
 
+        return preferences
+    }
+
+    private fun invokeSetPreferenceAnime(
+        source: AnimeCatalogueSource,
+        data: DataBody,
+    ): MutableList<Map<String, Any>> {
+        if (source !is ConfigurableAnimeSource) return mutableListOf()
+        return invokeSetPreference(source.id, data, source::setupPreferenceScreen)
+    }
+
+    private fun invokeSetPreferenceManga(
+        source: CatalogueSource,
+        data: DataBody,
+    ): MutableList<Map<String, Any>> {
+        if (source !is ConfigurableSource) return mutableListOf()
+        return invokeSetPreference(source.id, data, source::setupPreferenceScreen)
+    }
+
+    private fun invokeSetPreference(
+        sourceId: Long,
+        data: DataBody,
+        setup: (PreferenceScreen) -> Unit,
+    ): MutableList<Map<String, Any>> {
+        val preferenceManager: PreferenceManager? = preferenceManager
+        val instance: MExtensionServerPlugin? = instance
+        val context = instance?.applicationContext ?: return mutableListOf()
+        preferenceManager?.sharedPreferencesName = "source_$sourceId"
+        val screen = preferenceManager!!.createPreferenceScreen(context)
+        setup(screen)
+
+        val preferences = mutableListOf<Map<String, Any>>()
+        processPreferences(screen, preferences)
         return preferences
     }
 
