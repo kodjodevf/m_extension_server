@@ -15,9 +15,9 @@ JAVA_BUNDLE_ZIP="${CACHE_DIR}/java_bundle-device.zip"
 SERVER_URL="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v7/MExtensionServer-ios.jar"
 SERVER_SHA256="40f29f44014fbe1d68b9c368a7c88ab559f8de40e7554c4873389a475aee2fe0"
 OPENJDK_URL="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/OpenJDK.xcframework.zip"
-OPENJDK_SHA256="24589886361678b369e4703d82fcb3deff1b40728d725fef4fea7e70cb728f55"
+OPENJDK_SHA256="40030bd6a582d301798fc3775104a985fabf07ee2a4d4ffbc42e1bb27fb0a53d"
 JAVA_BUNDLE_URL="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/java_bundle-device.zip"
-JAVA_BUNDLE_SHA256="168d1174063a35ddda9e1acbd3978c8015e3ed656f6670d2e09688078e08deeb"
+JAVA_BUNDLE_SHA256="7a22aabad510c3060ccd792ac30a3f11172a106eeb7773e89b8b1c53241b7e84"
 
 if [ -d "${FRAMEWORKS_DIR}/OpenJDKRuntime.xcframework" ] &&
    [ -f "${RUNTIME_DIR}/MExtensionServer.jar" ]; then
