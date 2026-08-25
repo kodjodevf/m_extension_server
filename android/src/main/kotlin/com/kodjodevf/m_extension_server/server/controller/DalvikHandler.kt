@@ -31,8 +31,7 @@ class DalvikHandler {
             val result =
                 MExtensionServerLoader.invokeWithExtension(dataBody.data) { loadedExtension ->
                     val source =
-                        loadedExtension.source
-                            ?: throw IllegalArgumentException("No source found in extension")
+                        MihonInvoker.selectSource(loadedExtension.sources, dataBody)
 
                     // Get domain from source
                     val domain =
