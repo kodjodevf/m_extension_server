@@ -4,6 +4,7 @@ import android.util.Log
 import m_extension_server.impl.MExtensionServerLoader
 import m_extension_server.impl.MihonInvoker
 import m_extension_server.model.DataBody
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import eu.kanade.tachiyomi.network.HttpException
@@ -15,7 +16,10 @@ import okhttp3.HttpUrl
 import java.net.URI
 
 class DalvikHandler {
-    private val objectMapper = ObjectMapper().registerModule(KotlinModule.Builder().build())
+    private val objectMapper =
+        ObjectMapper()
+            .registerModule(KotlinModule.Builder().build())
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
     fun serve(session: NanoHTTPD.IHTTPSession): NanoHTTPD.Response =
         try {
