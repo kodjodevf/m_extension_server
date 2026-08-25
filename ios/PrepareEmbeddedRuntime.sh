@@ -2,7 +2,7 @@
 set -eu
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-CACHE_DIR="${HOME}/Library/Caches/m_extension_server/embedded-openjdk-ios13-v15"
+CACHE_DIR="${HOME}/Library/Caches/m_extension_server/embedded-openjdk-ios13-v16"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/m-extension-server-zero.XXXXXX")"
 FRAMEWORKS_DIR="${SCRIPT_DIR}/Frameworks"
 RUNTIME_DIR="${SCRIPT_DIR}/Runtime"
@@ -14,10 +14,10 @@ JAVA_BUNDLE_ZIP="${CACHE_DIR}/java_bundle-device.zip"
 
 SERVER_URL="https://github.com/1Selxo/M-Extension-Server/releases/download/ios-runtime-v7/MExtensionServer-ios.jar"
 SERVER_SHA256="40f29f44014fbe1d68b9c368a7c88ab559f8de40e7554c4873389a475aee2fe0"
-OPENJDK_URL="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/OpenJDK.xcframework.zip"
-OPENJDK_SHA256="24589886361678b369e4703d82fcb3deff1b40728d725fef4fea7e70cb728f55"
-JAVA_BUNDLE_URL="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v15/java_bundle-device.zip"
-JAVA_BUNDLE_SHA256="168d1174063a35ddda9e1acbd3978c8015e3ed656f6670d2e09688078e08deeb"
+OPENJDK_URL="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/OpenJDK.xcframework.zip"
+OPENJDK_SHA256="f21681caae40e508647e7f18c9082f27fa9aa67ee7f1376725eae528fa2d38cb"
+JAVA_BUNDLE_URL="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/java_bundle-device.zip"
+JAVA_BUNDLE_SHA256="15369b9bb9dfdd400c18c56b30e2f6cf316b81d4e0bae5ddd6b1fe72355c4b0b"
 
 if [ -d "${FRAMEWORKS_DIR}/OpenJDKRuntime.xcframework" ] &&
    [ -f "${RUNTIME_DIR}/MExtensionServer.jar" ]; then
