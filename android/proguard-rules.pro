@@ -80,7 +80,15 @@
 -keep interface okhttp3.** { *; }
 -dontwarn okhttp3.**
 -keep class okio.** { *; }
+-keep interface okio.** { *; }
 -dontwarn okio.**
+
+# Zstandard (OkioZstd)
+-keep class com.squareup.zstd.** { *; }
+-keep interface com.squareup.zstd.** { *; }
+-dontwarn com.squareup.zstd.**
+-keep class com.github.luben.zstd.** { *; }
+-dontwarn com.github.luben.zstd.**
 
 # Injekt
 -keep class uy.kohesive.injekt.** { *; }
