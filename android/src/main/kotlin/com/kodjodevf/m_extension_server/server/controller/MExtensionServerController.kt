@@ -30,6 +30,12 @@ class MExtensionServerController(
             when (session.uri) {
                 "/dalvik" -> DalvikHandler().serve(session)
                 "/" -> newFixedLengthResponse("MExtensionServer Server Running")
+                "/capabilities" ->
+                    newFixedLengthResponse(
+                        Response.Status.OK,
+                        "application/json",
+                        """{"mangayomiMihonBridge":1}""",
+                    )
                 "/stop" -> {
                     newFixedLengthResponse("Server stopping").also {
                         Thread {
