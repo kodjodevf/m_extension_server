@@ -97,7 +97,22 @@ class DalvikHandler {
                         }
                     }
 
-                    MihonInvoker.invokeMethod(source, dataBody)
+                    val cloudflareProxy =
+                        (session.headers[CF_PROXY_HEADER] ?: session.headers["Cf-Proxy-Url"])
+                    if (cloudflareProxy != null) {
+                        network?.setCloudflareProxyUrl(cloudflareProxy)
+                    }
+
+                    val baseUrlHeader =
+                        (session.headers[SOURCE_BASE_URL_HEADER] ?: session.headers["Source-Base-Url"])
+                    val invocationBody =
+                        if (baseUrlHeader.isNullOrBlank() || !dataBody.sourceBaseUrl.isNullOrBlank()) {
+                            dataBody
+                        } else {
+                            dataBody.copy(sourceBaseUrl = baseUrlHeader)
+                        }
+
+                    MihonInvoker.invokeMethod(source, invocationBody)
                 }
 
             // Serialize response
@@ -139,4 +154,13 @@ class DalvikHandler {
                 errorJson,
             )
         }
+    }
+
+    companion object {
+        /** Optional per-request FlareSolverr / Byparr URL, sent by the client. */
+        const val CF_PROXY_HEADER = "cf-proxy-url"
+
+        /** Identifies which source of a multi-source extension the call is for. */
+        const val SOURCE_BASE_URL_HEADER = "source-base-url"
+    }
 }
