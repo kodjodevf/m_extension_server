@@ -1,16 +1,16 @@
 package com.kodjodevf.m_extension_server.server.controller
 
 import android.util.Log
-import m_extension_server.impl.MExtensionServerLoader
-import m_extension_server.impl.MihonInvoker
-import m_extension_server.model.DataBody
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
-import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
+import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.source.online.HttpSource
 import fi.iki.elonen.NanoHTTPD
+import m_extension_server.impl.MExtensionServerLoader
+import m_extension_server.impl.MihonInvoker
+import m_extension_server.model.DataBody
 import okhttp3.Cookie
 import okhttp3.HttpUrl
 import java.net.URI
@@ -21,8 +21,8 @@ class DalvikHandler {
             .registerModule(KotlinModule.Builder().build())
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
-    fun serve(session: NanoHTTPD.IHTTPSession): NanoHTTPD.Response =
-        try {
+    fun serve(session: NanoHTTPD.IHTTPSession): NanoHTTPD.Response {
+        return try {
             // Parse JSON body first to get extension data
             val body = mutableMapOf<String, String>()
             session.parseBody(body)
@@ -53,6 +53,13 @@ class DalvikHandler {
                         } ?: "localhost"
 
                     val cleanDomain = domain.removePrefix("www.").removePrefix(".")
+
+                    val network =
+                        when (source) {
+                            is HttpSource -> source.network
+                            is AnimeHttpSource -> source.network
+                            else -> null
+                        }
 
                     val ua = session.headers["user-agent"] ?: session.headers["User-Agent"]
                     if (ua != null) {

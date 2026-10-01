@@ -97,7 +97,7 @@ class CloudflareInterceptor(
                 return null
             }
 
-            val body = response.body?.string().orEmpty()
+            val body = response.body.string()
             if (body.isEmpty()) return null
 
             val parsed = objectMapper.readValue<FlareResponse>(body)
