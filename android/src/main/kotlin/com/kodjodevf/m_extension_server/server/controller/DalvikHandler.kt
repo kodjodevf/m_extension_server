@@ -52,6 +52,13 @@ class DalvikHandler {
                             "localhost"
                         } ?: "localhost"
 
+                    val cleanDomain = domain.removePrefix("www.").removePrefix(".")
+
+                    val ua = session.headers["user-agent"] ?: session.headers["User-Agent"]
+                    if (ua != null) {
+                        network?.setUA(ua)
+                    }
+
                     // Intercept Cookie header and save to global cookie jar
                     val cookies =
                         (session.headers["cookie"] ?: session.headers["Cookie"])
@@ -62,39 +69,32 @@ class DalvikHandler {
                                     if (parts.size == 2) {
                                         val name = parts[0].trim()
                                         val value = parts[1].trim()
-                                        Cookie
-                                            .Builder()
-                                            .name(name)
-                                            .value(value)
-                                            .domain(domain.removePrefix("."))
-                                            .path("/")
-                                            .build()
+                                        try {
+                                            Cookie
+                                                .Builder()
+                                                .name(name)
+                                                .value(value)
+                                                .domain(cleanDomain)
+                                                .path("/")
+                                                .build()
+                                        } catch (_: Exception) {
+                                            null
+                                        }
                                     } else {
                                         null
                                     }
-                                }
+                                }.distinctBy { it.name }
                             }?.toList()
 
-                    val network =
-                        when (source) {
-                            is HttpSource -> source.network
-                            is AnimeHttpSource -> source.network
-                            else -> null
+                    if (!cookies.isNullOrEmpty() && cleanDomain != "localhost") {
+                        val httpUrl = try {
+                            HttpUrl.Builder().scheme("https").host(cleanDomain).build()
+                        } catch (_: Exception) {
+                            null
                         }
-
-                    if (cookies != null && cookies.isNotEmpty()) {
-                        network?.cookieJar?.addAll(
-                            HttpUrl
-                                .Builder()
-                                .scheme("http")
-                                .host(domain.removePrefix("."))
-                                .build(),
-                            cookies,
-                        )
-                    }
-                    val ua = session.headers["user-agent"] ?: session.headers["User-Agent"]
-                    if (ua != null) {
-                        network?.setUA(ua)
+                        if (httpUrl != null) {
+                            network?.cookieJar?.addAll(httpUrl, cookies)
+                        }
                     }
 
                     MihonInvoker.invokeMethod(source, dataBody)

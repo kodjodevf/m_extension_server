@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 class NetworkHelper(
     val context: Context,
 ) {
-    val cookieJar = MemoryCookieJar()
+    val cookieJar = AndroidCookieJar()
 
     val client by lazy {
         val builder =
