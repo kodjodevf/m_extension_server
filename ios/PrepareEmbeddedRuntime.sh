@@ -13,7 +13,7 @@ OPENJDK_ZIP="${CACHE_DIR}/OpenJDK.xcframework.zip"
 JAVA_BUNDLE_ZIP="${CACHE_DIR}/java_bundle-device.zip"
 
 SERVER_URL="https://github.com/kodjodevf/M-Extension-Server/releases/download/ios-runtime-v8/MExtensionServer-ios.jar"
-SERVER_SHA256="28dfa41a4631e6eec21e70bdace9aca91276eadaf6eba72a19469aad684ea61e"
+SERVER_SHA256="bee6e3289ea097e18494a20dfddcc855496f75bbf3cf8b19177c7958fd1de52e"
 OPENJDK_URL="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/OpenJDK.xcframework.zip"
 OPENJDK_SHA256="f21681caae40e508647e7f18c9082f27fa9aa67ee7f1376725eae528fa2d38cb"
 JAVA_BUNDLE_URL="https://github.com/1Selxo/Mangatan/releases/download/embedded-openjdk-ios13-v16/java_bundle-device.zip"
