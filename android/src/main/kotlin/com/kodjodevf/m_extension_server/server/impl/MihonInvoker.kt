@@ -43,6 +43,7 @@ import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
+import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
@@ -53,6 +54,7 @@ import com.kodjodevf.m_extension_server.preferenceManager
 import m_extension_server.model.BridgeMemo
 
 object MihonInvoker {
+    private const val KL_RAW_SOURCE_ID = "7433897302034602657"
     private const val BRIDGE_CONTEXT_KEY = "__mangayomi_bridge_context__"
 
     private fun bridgeContext(data: DataBody): Map<String, Any> =
@@ -344,20 +346,74 @@ object MihonInvoker {
         return runBlocking {
             val sChapter = chapterData.toSChapter(source)
             val pages = source.getPageList(sChapter)
+            val httpSource = source as? HttpSource
+
+            val overridesFetchImage =
+                if (httpSource != null) {
+                    try {
+                        val method =
+                            httpSource.javaClass.getMethod(
+                                "fetchImage",
+                                Page::class.java,
+                            )
+                        method.declaringClass != HttpSource::class.java
+                    } catch (_: Exception) {
+                        false
+                    }
+                } else {
+                    false
+                }
+            val isSpecialSource = httpSource != null && httpSource.id.toString() == KL_RAW_SOURCE_ID
+
             pages.map { page ->
-                JPage(
-                    index = page.index,
-                    url = page.url,
-                    imageUrl =
-                        if (source is HttpSource) {
-                            if (page.imageUrl == null) {
-                                runCatching { page.imageUrl = source.getImageUrl(page) }
+                if (httpSource != null) {
+                    val rawImageUrl = page.imageUrl
+                    val isStandardHttpUrl =
+                        rawImageUrl != null &&
+                            (
+                                rawImageUrl.startsWith("http://", ignoreCase = true) ||
+                                    rawImageUrl.startsWith("https://", ignoreCase = true)
+                            ) &&
+                            !rawImageUrl.contains("#")
+
+                    val useProxy =
+                        overridesFetchImage || isSpecialSource || !isStandardHttpUrl
+
+                    if (useProxy) {
+                        JPage(
+                            index = page.index,
+                            url = page.url,
+                            imageUrl =
+                                MihonImageProxy.register(httpSource, page)
+                                    ?: run {
+                                        if (page.imageUrl == null) {
+                                            runCatching { page.imageUrl = httpSource.getImageUrl(page) }
+                                        }
+                                        httpSource.imageRequest(page).url.toString()
+                                    },
+                        )
+                    } else {
+                        val request = httpSource.imageRequest(page)
+                        val directUrl = request.url.toString()
+                        val reqHeaders = request.headers
+                        val headersMap =
+                            (0 until reqHeaders.size).associate {
+                                reqHeaders.name(it) to reqHeaders.value(it)
                             }
-                            source.imageRequest(page).url.toString()
-                        } else {
-                            page.imageUrl ?: page.url
-                        },
-                )
+                        JPage(
+                            index = page.index,
+                            url = page.url,
+                            imageUrl = directUrl,
+                            headers = if (headersMap.isNotEmpty()) headersMap else null,
+                        )
+                    }
+                } else {
+                    JPage(
+                        index = page.index,
+                        url = page.url,
+                        imageUrl = page.imageUrl ?: page.url,
+                    )
+                }
             }
         }
     }
