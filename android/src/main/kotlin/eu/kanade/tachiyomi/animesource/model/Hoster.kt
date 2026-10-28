@@ -43,6 +43,14 @@ open class Hoster(
         videoList: List<Video>? = this.videoList,
         internalData: String = this.internalData,
         lazy: Boolean = this.lazy,
+    ): Hoster = Hoster(hosterUrl, hosterName, videoList, internalData, lazy, this.memo)
+
+    fun copy(
+        hosterUrl: String = this.hosterUrl,
+        hosterName: String = this.hosterName,
+        videoList: List<Video>? = this.videoList,
+        internalData: String = this.internalData,
+        lazy: Boolean = this.lazy,
         memo: JsonObject = this.memo,
     ): Hoster = Hoster(hosterUrl, hosterName, videoList, internalData, lazy, memo)
 
