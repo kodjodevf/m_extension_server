@@ -6,10 +6,12 @@ import eu.kanade.tachiyomi.network.interceptor.IgnoreGzipInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UserAgentInterceptor
 import okhttp3.Cache
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.brotli.BrotliInterceptor
 import okhttp3.logging.HttpLoggingInterceptor
 import java.nio.file.Files
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 class NetworkHelper(
@@ -23,14 +25,14 @@ class NetworkHelper(
                 .Builder()
                 .cookieJar(cookieJar)
                 .addInterceptor(UncaughtExceptionInterceptor())
+                .addInterceptor(UserAgentInterceptor(::userAgentFor))
                 .addInterceptor(
                     CloudflareInterceptor(
                         ::cloudflareProxyUrlProvider,
-                        ::setUA,
+                        ::setSolvedUA,
                         cookieJar::addAll,
                     ),
                 )
-                .addInterceptor(UserAgentInterceptor(::defaultUserAgentProvider))
                 .addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY))
                 .addInterceptor(IgnoreGzipInterceptor())
                 .addInterceptor(BrotliInterceptor)
@@ -57,6 +59,19 @@ class NetworkHelper(
     }
 
     fun defaultUserAgentProvider() = defaultUserAgent
+
+    private val solvedUserAgents = ConcurrentHashMap<String, String>()
+
+    fun setSolvedUA(
+        host: String,
+        ua: String,
+    ) {
+        solvedUserAgents[host] = ua
+    }
+
+    fun userAgentFor(url: HttpUrl) = solvedUserAgents[url.host] ?: defaultUserAgent
+
+    fun hasSolvedClearance(host: String): Boolean = solvedUserAgents.containsKey(host)
 
     private var cloudflareProxyUrl: String = ""
 

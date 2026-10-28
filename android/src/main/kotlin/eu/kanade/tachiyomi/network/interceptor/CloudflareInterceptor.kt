@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
  */
 class CloudflareInterceptor(
     private val proxyUrl: () -> String,
-    private val setUserAgent: (String) -> Unit,
+    private val setUserAgent: (host: String, userAgent: String) -> Unit,
     private val storeCookies: (HttpUrl, List<Cookie>) -> Unit,
 ) : Interceptor {
 
@@ -42,7 +42,6 @@ class CloudflareInterceptor(
             .build()
     }
 
-    @Synchronized
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
         val response = chain.proceed(originalRequest)
@@ -71,6 +70,7 @@ class CloudflareInterceptor(
         return chain.proceed(applySolution(originalRequest, solution))
     }
 
+    @Synchronized
     private fun solve(
         proxyUrl: String,
         targetUrl: String,
@@ -131,7 +131,7 @@ class CloudflareInterceptor(
 
         if (solution.userAgent.isEmpty()) return request
 
-        setUserAgent(solution.userAgent)
+        setUserAgent(request.url.host, solution.userAgent)
         return request
             .newBuilder()
             .header("User-Agent", solution.userAgent)

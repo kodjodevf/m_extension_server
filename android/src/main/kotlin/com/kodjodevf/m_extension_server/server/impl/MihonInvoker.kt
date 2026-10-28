@@ -364,6 +364,12 @@ object MihonInvoker {
                     false
                 }
             val isSpecialSource = httpSource != null && httpSource.id.toString() == KL_RAW_SOURCE_ID
+            val hasCustomInterceptors =
+                if (httpSource != null) {
+                    hasCustomClientInterceptors(httpSource)
+                } else {
+                    false
+                }
 
             pages.map { page ->
                 if (httpSource != null) {
@@ -377,7 +383,11 @@ object MihonInvoker {
                             !rawImageUrl.contains("#")
 
                     val useProxy =
-                        overridesFetchImage || isSpecialSource || !isStandardHttpUrl
+                        overridesFetchImage ||
+                            isSpecialSource ||
+                            hasCustomInterceptors ||
+                            !isStandardHttpUrl ||
+                            hasSolvedClearanceForImage(httpSource, rawImageUrl)
 
                     if (useProxy) {
                         JPage(
@@ -417,6 +427,48 @@ object MihonInvoker {
             }
         }
     }
+
+    private fun hasCustomClientInterceptors(httpSource: HttpSource): Boolean {
+        val overridesClient =
+            try {
+                httpSource.javaClass.getMethod("getClient").declaringClass != HttpSource::class.java
+            } catch (_: Exception) {
+                false
+            }
+        if (!overridesClient) return false
+
+        return runCatching {
+            val defaultClient = runCatching { httpSource.network.client }.getOrNull()
+            val sourceClient = httpSource.client
+            if (defaultClient != null) {
+                sourceClient.interceptors != defaultClient.interceptors ||
+                    sourceClient.networkInterceptors != defaultClient.networkInterceptors
+            } else {
+                sourceClient.interceptors.isNotEmpty() ||
+                    sourceClient.networkInterceptors.isNotEmpty()
+            }
+        }.getOrDefault(true)
+    }
+
+    private fun hasSolvedClearanceForImage(
+        httpSource: HttpSource,
+        rawImageUrl: String?,
+    ): Boolean =
+        runCatching {
+            val net = httpSource.network
+            val baseHost =
+                runCatching {
+                    okhttp3.HttpUrl.Companion.run { httpSource.baseUrl.toHttpUrl().host }
+                }.getOrNull()
+            val imageHost =
+                rawImageUrl?.let {
+                    runCatching {
+                        okhttp3.HttpUrl.Companion.run { it.toHttpUrl().host }
+                    }.getOrNull()
+                }
+            (baseHost != null && net.hasSolvedClearance(baseHost)) ||
+                (imageHost != null && net.hasSolvedClearance(imageHost))
+        }.getOrDefault(false)
 
     private fun invokeHeadersAnime(source: AnimeCatalogueSource): List<String> =
         if (source is AnimeHttpSource) {
