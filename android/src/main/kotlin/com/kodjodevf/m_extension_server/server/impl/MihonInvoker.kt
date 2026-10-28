@@ -58,6 +58,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import okhttp3.Headers
 import kotlinx.coroutines.withTimeoutOrNull
 import com.kodjodevf.m_extension_server.MExtensionServerPlugin
 import com.kodjodevf.m_extension_server.instance
@@ -826,14 +827,41 @@ object MihonInvoker {
                             ?: Result.failure(TimeoutException("Hoster timed out after ${HOSTER_TIMEOUT_MS}ms"))
                     }
             hosterScope.cancel()
-            val videos =
+            val rawVideos =
                 results
                     .flatMap { it.getOrDefault(emptyList()) }
                     .sortedByDescending { it.preferred }
-            if (videos.isEmpty()) {
+            if (rawVideos.isEmpty()) {
                 results.firstNotNullOfOrNull { it.exceptionOrNull() }?.let { throw it }
             }
-            videos
+            rawVideos.map { video ->
+                val fallbackHeaders =
+                    runCatching {
+                        val defaultHeaders = source.headers
+                        val builder = defaultHeaders.newBuilder()
+                        video.headers?.forEach { (name, value) ->
+                            builder.set(name, value)
+                        }
+                        builder.build()
+                    }.getOrDefault(video.headers ?: Headers.Builder().build())
+
+                Video(
+                    url = video.url.ifEmpty { video.videoUrl.orEmpty() },
+                    quality = video.quality,
+                    videoUrl = video.videoUrl,
+                    headers = fallbackHeaders,
+                    subtitleTracks = video.subtitleTracks,
+                    audioTracks = video.audioTracks,
+                    timestamps = video.timestamps,
+                ).also {
+                    it.resolution = video.resolution
+                    it.bitrate = video.bitrate
+                    it.preferred = video.preferred
+                    it.mpvArgs = video.mpvArgs
+                    it.ffmpegStreamArgs = video.ffmpegStreamArgs
+                    it.ffmpegVideoArgs = video.ffmpegVideoArgs
+                }
+            }
         }
     }
 

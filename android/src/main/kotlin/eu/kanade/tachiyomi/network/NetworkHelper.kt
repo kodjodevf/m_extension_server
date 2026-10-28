@@ -52,10 +52,15 @@ class NetworkHelper(
         client
     }
 
-    private var defaultUserAgent: String = System.getProperty("http.agent").orEmpty()
+    private var defaultUserAgent: String =
+        System.getProperty("http.agent").takeUnless { it.isNullOrBlank() }
+            ?: DEFAULT_USER_AGENT
 
     fun setUA(ua: String) {
-        defaultUserAgent = ua
+        val trimmed = ua.trim()
+        if (trimmed.isNotEmpty() && !trimmed.startsWith("Dart/", ignoreCase = true)) {
+            defaultUserAgent = trimmed
+        }
     }
 
     fun defaultUserAgentProvider() = defaultUserAgent
@@ -81,4 +86,9 @@ class NetworkHelper(
     }
 
     fun cloudflareProxyUrlProvider() = cloudflareProxyUrl
+
+    companion object {
+        const val DEFAULT_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0"
+    }
 }
